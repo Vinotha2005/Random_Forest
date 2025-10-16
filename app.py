@@ -1,107 +1,40 @@
 # app.py
 import streamlit as st
-import pickle
 import pandas as pd
-import numpy as np  # ✅ Added import
+import pickle
 
-# -----------------------------
-# Load model and components
-# -----------------------------
-model = pickle.load(open("loan_model.pkl", "rb"))
-encoders = pickle.load(open("encoders.pkl", "rb"))
-scaler = pickle.load(open("scaler.pkl", "rb"))
-pt = pickle.load(open("power_transformer.pkl", "rb"))
-feature_columns = pickle.load(open("feature_columns.pkl", "rb"))
-
-# -----------------------------
-# Streamlit UI
-# -----------------------------
-st.set_page_config(page_title="🏦 Loan Approval Predictor", layout="centered")
+# Load the model and encoders
+with open("model.pkl", "rb") as f:
+    data = pickle.load(f)
+    model = data["model"]
+    label_encoders = data["label_encoders"]
+    columns = data["columns"]
 
 st.title("🏦 Loan Approval Prediction App")
-st.write("This app predicts loan approval likelihood using a trained Random Forest model.")
+st.markdown("Enter applicant details below to predict loan approval status:")
 
-# -----------------------------
-# Input Fields
-# -----------------------------
-col1, col2 = st.columns(2)
+# Create input fields dynamically
+user_input = {}
+for col in columns:
+    user_input[col] = st.text_input(f"Enter {col}")
 
-person_age = col1.number_input("Applicant Age", 18, 100, 30)
-person_income = col2.number_input("Annual Income ($)", 1000, 200000, 50000)
-person_emp_exp = col1.number_input("Years of Employment", 0, 40, 5)
-loan_amnt = col2.number_input("Loan Amount ($)", 500, 50000, 10000)
-loan_int_rate = col1.number_input("Interest Rate (%)", 1.0, 30.0, 12.5)
-loan_percent_income = col2.number_input("Loan % of Income", 0.0, 1.0, 0.2)
-cb_person_cred_hist_length = col1.number_input("Credit History (Years)", 1, 50, 5)
-credit_score = col2.number_input("Credit Score", 300, 850, 700)
+if st.button("Predict Loan Status"):
+    # Convert input to DataFrame
+    input_df = pd.DataFrame([user_input])
 
-person_gender = col1.selectbox("Gender", ["male", "female"])
-person_education = col2.selectbox("Education Level", ["high_school", "bachelor", "master", "doctorate", "other"])
-person_home_ownership = col1.selectbox("Home Ownership", ["rent", "own", "mortgage", "other"])
-loan_intent = col2.selectbox("Loan Intent", ["personal", "education", "medical", "venture", "homeimprovement", "debtconsolidation"])
-previous_loan_defaults_on_file = col1.selectbox("Previous Loan Defaults", ["y", "n"])
+    # Apply label encoding (for categorical columns)
+    for col, le in label_encoders.items():
+        if col in input_df.columns:
+            try:
+                input_df[col] = le.transform(input_df[col])
+            except ValueError:
+                st.warning(f"⚠️ Unknown category entered for '{col}'. Using default value 0.")
+                input_df[col] = 0
 
-# -----------------------------
-# Prepare input DataFrame
-# -----------------------------
-input_data = {
-    "person_age": person_age,
-    "person_income": person_income,
-    "person_emp_exp": person_emp_exp,
-    "loan_amnt": loan_amnt,
-    "loan_int_rate": loan_int_rate,
-    "loan_percent_income": loan_percent_income,
-    "cb_person_cred_hist_length": cb_person_cred_hist_length,
-    "credit_score": credit_score,
-    "person_gender": person_gender,
-    "person_education": person_education,
-    "person_home_ownership": person_home_ownership,
-    "loan_intent": loan_intent,
-    "previous_loan_defaults_on_file": previous_loan_defaults_on_file
-}
+    # Ensure same column order and numeric types
+    input_df = input_df.reindex(columns=columns, fill_value=0)
+    input_df = input_df.apply(pd.to_numeric, errors='coerce').fillna(0)
 
-df_input = pd.DataFrame([input_data])
-
-# -----------------------------
-# Encode categoricals safely
-# -----------------------------
-for col, le in encoders.items():
-    if col in df_input.columns:
-        df_input[col] = df_input[col].astype(str).str.lower()
-        unseen = set(df_input[col]) - set(le.classes_)
-        if unseen:
-            # Extend known classes for unseen label
-            le.classes_ = np.append(le.classes_, list(unseen))
-        df_input[col] = le.transform(df_input[col])
-
-# -----------------------------
-# Apply transformations
-# -----------------------------
-numeric_cols = ['person_age', 'person_income', 'person_emp_exp', 'loan_amnt',
-                'loan_int_rate', 'loan_percent_income', 'cb_person_cred_hist_length', 'credit_score']
-
-df_input[numeric_cols] = pt.transform(df_input[numeric_cols])
-df_input[numeric_cols] = scaler.transform(df_input[numeric_cols])
-
-# -----------------------------
-# Ensure column order matches training
-# -----------------------------
-df_input = df_input.reindex(columns=feature_columns, fill_value=0)
-proba = model.predict_proba(df_input)[0][1]  # probability of approval (1)
-threshold = 0.4  # you can tune this, default 0.5
-if proba >= threshold:
-    result = f"✅ Loan Approved (Probability: {proba:.2f})"
-else:
-    result = f"❌ Loan Rejected (Probability: {proba:.2f})"
-st.success(result)
-
-# Predict
-# -----------------------------
-if st.button("Predict Loan Approval 💡"):
-    prediction = model.predict(df_input)[0]
-    result = "✅ Loan Approved" if prediction == 1 else "❌ Loan Rejected"
-    st.success(result)
-    st.write(f"**Model Output:** {prediction}")
-
-st.markdown("---")
-st.caption("Built with ❤️ using Streamlit and Scikit-learn")
+    # Make prediction
+    prediction = model.predict(input_df)[0]
+    st.success(f"🎯 Prediction: {'Approved ✅' if prediction == 1 else 'Rejected ❌'}")
