@@ -151,10 +151,11 @@ python loan_approval.py
 (Optional) Add loan_data.csv in the same directory.
 
 ## 📊 Results Summary
-Model	Accuracy	Precision	Recall	F1 Score
-Random Forest	~0.92	~0.91	~0.90	~0.91
-Decision Tree	~0.86	~0.85	~0.84	~0.84
-SVM	~0.82	~0.80	~0.78	~0.79
+| Model               | Accuracy | Precision | Recall | F1 Score |
+| ------------------- | -------- | --------- | ------ | -------- |
+| Random Forest       | ~0.92    | ~0.91     | ~0.90  | ~0.91    |  |
+| Decision Tree       | ~0.86    | ~0.85     | ~0.84  | ~0.84    |
+| SVM                 | ~0.82    | ~0.80     | ~0.78  | ~0.79    |
 
 (Note: Actual values depend on dataset variation.)
 
